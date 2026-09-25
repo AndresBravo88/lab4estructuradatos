@@ -41,11 +41,15 @@ TreeNode * createTreeNode(void* key, void * value) {
 // 1. Implemente la función createTreeMap en el archivo treemap.c. 
 // Esta función recibe la función de comparación de claves y crea un mapa (TreeMap) inicializando sus variables. 
 // Reserve memoria, inicialice el resto de variables y retorne el mapa.
-    
-TreeMap * createTreeMap(int (*lower_than) (void* key1, void* key2)) {
 
-    //map->lower_than = lower_than;
-    return NULL;
+TreeMap * createTreeMap(int (*lower_than) (void* key1, void* key2)) {
+    TreeMap * map = (TreeMap *)malloc(sizeof(TreeMap));
+    if(map == NULL) return NULL;
+
+    map->root = NULL;
+    map->current = NULL;
+    map->lower_than = lower_than;
+    return map;
 }
 
 // 2. Implemente la función Pair* searchTreeMap(TreeMap* tree, void* key), 
@@ -53,6 +57,24 @@ TreeMap * createTreeMap(int (*lower_than) (void* key1, void* key2)) {
 // Si no se encuentra la clave retorna NULL. Recuerde hacer que el current apunte al nodo encontrado.
 
 Pair * searchTreeMap(TreeMap * tree, void* key) {
+    if(tree == NULL || tree->root == NULL) return NULL;
+    TreeNode * aux = tree->root;
+    while(aux != NULL)
+    {
+        if (is_equal(tree,key,aux->pair->key))
+        {
+            tree->current = aux;
+            return aux->pair;
+        }
+        if(tree->lower_than(key,aux->pair->key) == 1)
+        {
+            aux = aux->left;
+        }
+        else 
+        {
+            aux = aux->right;
+        }
+    }
     return NULL;
 }
 
@@ -62,7 +84,33 @@ Pair * searchTreeMap(TreeMap * tree, void* key) {
 // Luego crear el nuevo nodo y enlazarlo. Si la clave del dato ya existe retorne sin hacer nada (recuerde que el mapa no permite claves repetidas).
 
 void insertTreeMap(TreeMap * tree, void* key, void * value) {
-
+    if(tree == NULL) return;
+    if(tree->root == NULL){
+        tree->root = createTreeNode(key, value);
+        tree->current = tree->root;
+        return;
+    }
+    TreeNode * aux = tree->root;
+    TreeNode * parent = NULL;
+    while(aux != NULL)
+        {
+            if(is_equal(tree, key,aux->pair->key)) return;
+            parent = aux;
+            if(tree->lower_than(key,aux->pair->key) == 1){
+                aux = aux->left;
+            }
+            else{
+                aux = aux->right;
+            }
+        }
+    TreeNode * newNode = createTreeNode(key,value);
+    newNode->parent = parent;
+    if(tree->lower_than(key,parent->pair->key) == 1){
+        parent->left = newNode;
+    }else{
+        parent->right = newNode;
+    }
+    tree->current = newNode;
 }
 
 // 4. Implemente la función TreeNode * minimum(TreeNode * x). 
@@ -71,8 +119,12 @@ void insertTreeMap(TreeMap * tree, void* key, void * value) {
 // Si x no tiene hijo izquierdo se retorna el mismo nodo.
 
 TreeNode * minimum(TreeNode * x){
+    if (x == NULL) return NULL;
+    while(x->left != NULL){
+        x = x->left;
+    }
 
-    return NULL;
+    return x;
 }
 
 // 5.- Implemente la función void removeNode(TreeMap * tree, TreeNode* node). 
@@ -84,7 +136,43 @@ TreeNode * minimum(TreeNode * x){
 // Reemplace los datos (key,value) de node con los del nodo "minimum". Elimine el nodo minimum (para hacerlo puede usar la misma función removeNode).
 
 void removeNode(TreeMap * tree, TreeNode* node) {
+    if(tree == NULL || node == NULL) return;
+    if(node->left == NULL && node->right == NULL){
+        if(node->parent  == NULL){
+            tree->root = NULL;
+        }else if(node->parent->left == node){
+            node->parent->left = NULL;
+        }else{
+            node->parent->right = NULL;
+        }
+        free(node->pair);
+        free(node);
+        return;
+    }
+    if(node->left != NULL && node->right != NULL){
+        TreeNode * minNode = minimum(node->right);
+        node->pair->key = minNode->pair->key;
+        node->pair->value = minNode->pair->value;
+        removeNode(tree, minNode);
+        return;
+    }
+    TreeNode * child = NULL;
+    if (node->left != NULL) {
+        child = node->left;
+    } else {
+        child = node->right;
+    }
 
+    child->parent = node->parent;
+
+    if (node->parent == NULL) {
+        tree->root = child;
+    } else if (node->parent->left == node) {
+        node->parent->left = child;
+    } else {
+        node->parent->right = child;
+    }
+    free(node);
 }
 
 void eraseTreeMap(TreeMap * tree, void* key){
@@ -102,10 +190,31 @@ void eraseTreeMap(TreeMap * tree, void* key){
 // Recuerde actualizar este puntero.
 
 Pair * firstTreeMap(TreeMap * tree) {
-    return NULL;
+    if (tree == NULL || tree->root == NULL) return NULL;
+
+    TreeNode * minNode = minimum(tree->root);
+    tree->current = minNode;
+    return minNode->pair;
 }
 
 Pair * nextTreeMap(TreeMap * tree) {
+    if (tree == NULL || tree->current == NULL) return NULL;
+
+    TreeNode * curr = tree->current;
+
+    if (curr->right != NULL) {
+        tree->current = minimum(curr->right);
+        return tree->current->pair;
+    }
+
+    TreeNode * p = curr->parent;
+    while (p != NULL && curr == p->right) {
+        curr = p;
+        p = p->parent;
+    }
+
+    tree->current = p;
+    if (p != NULL) return p->pair;
     return NULL;
 }
 
@@ -115,6 +224,29 @@ Pair * nextTreeMap(TreeMap * tree) {
 // Finalmente retorne el par del nodo ub_node.
 
 Pair * upperBound(TreeMap * tree, void* key) {
+    if (tree == NULL || tree->root == NULL) return NULL;
+
+    TreeNode * aux = tree->root;
+    TreeNode * ub_node = NULL;
+
+    while (aux != NULL) {
+        if (is_equal(tree, key, aux->pair->key)) {
+            tree->current = aux;
+            return aux->pair;
+        }
+        if (tree->lower_than(key, aux->pair->key) == 1) {
+            ub_node = aux;
+            aux = aux->left;
+        } else {
+            aux = aux->right;
+        }
+    }
+
+    if (ub_node != NULL) {
+        tree->current = ub_node;
+        return ub_node->pair;
+    }
+
     return NULL;
 }
 
